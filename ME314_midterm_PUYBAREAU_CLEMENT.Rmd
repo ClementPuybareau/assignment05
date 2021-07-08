@@ -1,0 +1,390 @@
+---
+title: "Midterm Assignemnt, ME314 2021"
+output: html_document
+---
+#### Summer School 2021 midsession examination  
+# ME314 Introduction to Data Science and Machine Learning 
+## Suitable for all candidates
+### Instructions to candidates  
+
+* Complete the assignment by adding your answers directly to the RMarkdown document, knitting the document, and submitting the HTML file to Moodle.   
+* Submit the assignment via [Moodle](https://shortcourses.lse.ac.uk/course/view.php?id=158).
+
+## Question 1 (60 points)
+
+```{r, echo = FALSE}
+
+covid_data <- read.csv("https://raw.githubusercontent.com/lse-me314/lse-me314.github.io/master/data/covid_country_data.csv")
+
+```
+
+This question should be answered using the `covid_country_data.csv` data set, which can be loaded directly from the course website using the command listed below. This data contains observations from `r nrow(covid_data)` countries, and includes information on various indicators which might be predictive of the severity of the COVID-19 pandemic in each country. The data includes the following variables:
+
+|Variable name|Description|
+|:------------|:------------------------------------------------|
+|`countryiso3`|Unique country identifier|
+|`country`|Country name|
+|`deaths_per_100k`|Total number of deaths recorded from COVID-19 per 100,000 people in the population|
+|`female_leader`|`TRUE` if the country has a female president or prime minister and `FALSE` otherwise|
+|`ghs_index`|The Global Health Security index score, a 2019 measure that aimed to predict how prepared each country was for handling epidemics and pandemics|
+|`gdp_percap`|GDP per capita in current US dollars, measured in 2016|
+|`pct_urban`|The percentage of the population living in urban agglomerations of more than 1 million, measured in 2016|
+|`health_gdp_pct`|Current health expenditure as a percentage of GDP, measured in 2016|
+|`democracy`|`TRUE` if the country is a democracy and `FALSE` otherwise (Polity IV, dichotomised at 6)|
+|`continent`|The continent in which the country is located|
+
+You can load the data by using the following command:
+
+```{r, echo = TRUE}
+
+covid_data <- read.csv("https://raw.githubusercontent.com/lse-me314/lse-me314.github.io/master/data/covid_country_data.csv")
+
+summary(covid_data)
+
+```
+
+
+
+
+#### a. Fit a regression model predicting `deaths_per_100k` using `pct_urban` and `female_leader` as predictors.  Interpret the coefficients, the $R^2$, and the residual standard error from the regression (by explaining each in a few statements). 
+
+
+* __Code__
+
+```{r, echo = TRUE}
+
+# We extract a model based on the indicated variables.
+# We use the "+" operators to do a multiple regression
+lm.fit <- lm(deaths_per_100k ~ pct_urban + female_leader, data = covid_data)
+
+# We use the summary function to show the results
+summary(lm.fit)
+
+```
+
+* __Coefficient analysis:__
+
+*We suppose that every variables other than the one mentioned stay constant.*
+
+**`pct_urban`: each time this value goes up 1 per cent, the number of deaths per 100k people increases by 0,32. We can suppose that the more urban a country is, the more death due to covid it will have. We can see that this coefficient is significant at less than 0.01.**
+
+**`female_leader`: according to the model, having a female leader reduces the number of deaths per 100k people by 0.97. At first glance this indicates that female leaders did a better job than their male counterparts.**
+
+
+* __$R^2$ analysis:__
+
+**This value indicates how well the model fits the actual data, on a scale of 0-100%. Here the value we get is 0.0605, which is very low. We can conclude that our current model is not an accurate representation of reality.**
+
+**To grasp how inaccurate the model is we can plot it alongside the actual values:**
+
+```{r, echo=TRUE, warning=FALSE}
+
+# This chunk of code is used to plot the data in a more comprehensive and aesthetic way
+require(ggplot2)
+
+eq1=function(x){coef(lm.fit)[2]*x+coef(lm.fit)[1]}
+eq2=function(x){coef(lm.fit)[2]*x+coef(lm.fit)[1]+coef(lm.fit)[3]}
+
+ggplot(covid_data,aes(y=deaths_per_100k,x=pct_urban,color=female_leader))+geom_point()+
+    stat_function(fun=eq1,geom="line",color=scales::hue_pal()(2)[1])+
+    stat_function(fun=eq2,geom="line",color=scales::hue_pal()(2)[2])
+
+```
+
+
+* __Residual Standard Error (RSE) analysis:__
+
+**Here the model is giving us a RSE of 20.29. To interpret this data we need to have more information on the average value of "deaths_per_100k". Instead of plotting every value we just want to first see the mean:**
+
+```{r, echo=TRUE}
+
+# The "complete.cases" function filters out every NA from the dataset
+mean(covid_data[complete.cases(covid_data),"deaths_per_100k"])
+
+```
+
+**Based on the RSE, actual data deviates from the model by 20.29 on average, which is very large compared to the mean value of 14.23. This further proves the inadequacy of the model to fit represent the reality of covid deaths.**
+
+
+
+#### b. Fit a second model which includes the *interaction* between `pct_urban` and `female_leader`.  Interpret the coefficients in this new model. Does the effect pf `pct_urban` depend on whether a country has a female president or prime minister? 
+
+* __Code__
+
+```{r, echo = TRUE}
+
+# Compared to the first question, we use the "*" operator to 
+lm.fit <- lm(deaths_per_100k ~ pct_urban * female_leader, data = covid_data)
+
+# We use the summary function to show the results
+summary(lm.fit)
+
+```
+
+* __Coefficients analysis__
+
+*We suppose that every variables other than the one mentioned stay constant.*
+
+**Compared to the previous model, the `pct_urban` coefficient does not change much, meaning its impact is relatively similar on its own. However, we can see that the `female_leader` coefficient jumped from a negative to a very high 6.28. With just these elements we could think that having a female leader suddenly increases the deaths by 6, but we cannot conclude just yet, because we need to take into account a new coefficient.**
+
+**`pct_urban * female_leader`: this coefficient represents the relationship between the two data, and is equal to -0.289. When `female_leader` is FALSE (meaning, equal to 0), it does not intervene. But in the case of a country with a female leader, each time `pct_urban` gains a point, the number of death is expected to reduce by 0.289.**
+
+**What this means is that, having a female leader has a negative impact on deaths number in countries with low urban population, but with countries with a `pct_urban` above around 21, having a female leader has a positive impact.**
+
+
+#### c. Are either of the two models you estimated preferable as a predictive model? Why?  
+
+
+**I do not think either of the two models is useful as a predictive model. We already saw why the first one is not a good fit.**
+
+**As for the second one, it highlighted a particular behavior for countries with female leaders and low vs high urban population. But the values it produces are still far from the reality. The RSE barely moved (from 20.29 to 20.28) and the $R^2$ even increased, meaning the model fails even more to fit the data.**
+
+**The difference in $R^2$ and the fact that the F-statistic is higher in the model 1 make me say that it is slightly better than the model including interaction.**
+
+
+#### d. Pick one further explanatory variable from the data to include in addition to the variables included in your answer to question 2. Interpret the relevant coefficient(s) on the new variable that you include and describe whether your new model improves on the predictive power of the two previous models. 
+
+**I chose to add the variable `ghs_index` because I think how prepared a country is has a big impact on the consequences of a pandemic. I add this variable to the model built in the previous question and output the summary to compare the results.**
+
+* __Code__
+
+```{r, echo = TRUE}
+
+lm.fit <- lm(deaths_per_100k ~ pct_urban * female_leader + ghs_index, data = covid_data)
+
+# We use the summary function to show the results
+summary(lm.fit)
+
+```
+
+* __Conclusion__
+
+**The first observation is that this new variable has a much higher significance than the older ones, being less than 0.001. It is encouraging because it means this variable might explain the data better.**
+
+**Compared to the other models, the p-value is a reduced by a factor of 100, which means the model is more precise. This is confirmed by the $R^2$ values, again being higher than the other model by a factor of about 4. This means that this new model better fits the initial dataset.**
+
+**These elements suggest that this variable is more relevant than the previous ones to describe what is happening. However it still has limits, as the RSE is still very high compared to the actual values.**
+
+
+## Question 2 (40 points)
+
+```{r, echo=FALSE, eval = TRUE}
+ess <- read.csv("https://raw.githubusercontent.com/lse-me314/lse-me314.github.io/master/data/ess.csv")
+```
+
+Can we predict whether individuals would like their country to leave the European Union? This question uses a dataset which includes several variables taken from the 2016 European Social Survey [(https://www.europeansocialsurvey.org)](https://www.europeansocialsurvey.org). The unit of analysis is individual respondents to a face-to-face survey. There are a total of `r nrow(ess)` observations in the data, with respondents surveyed in `r length(unique(ess$country_code))` different European countries. 
+
+The data includes the following variables:
+
+|**Variable**|**Description**|
+|---------------|-------------------------------------------------------------|
+|`country_code`|The country of the respondent|
+|`leave`|1 if the respondent would vote to leave the European Union in a referendum, 0 otherwise|
+|`gender`|Whether the respondent is male or female|
+|`age`|The age of the respondent (in years)|
+|`years_education`| The number of years of education the respondent has completed|
+|`unemployed`|1 if the respondent is unemployed, 0 otherwise|
+|`income`|1 if the respondent earns above the median income in their country, 0 otherwise|
+|`religion`|Categorical variable of the religion of the respondent|
+|`trade_union`|1 if the respondent is a member of a trade union, 0 otherwise|
+|`news_consumption`|Amount of time the respondent spends reading newspapers/online news each week (in minutes)|
+|`trust_people`|The degree to which the respondent trusts other people (0 = low trust, 10 = high trust)|
+|`trust_politicians`|The degree to which the respondent trusts politicians (0 = low trust, 10 = high trust)|
+|`past_vote`|1 if the respondent voted in the last general election in their country, 0 otherwise|
+|`immig_econ`|The respondent's view of the economic effects of immigration in their country (0 = Immigration is bad for the economy; 10 = Immigration is good for the economy)|
+|`immig_culture`|The respondent's view of the cultural effects of immigration in their country (0 = Immigration undermines the country's culture; 10 = Immigration enriches the country's culture)|
+|`country_attach`|The respondent's emotional attachment to their country (0 = Not at all emotionally attached; 10 = Very emotionally attached)|
+|`climate_change`|How worried the respondent is about climate change (1 = Not at all worried; 5 = Very worried)|
+|`imp_tradition`|How important the respondent feels it is to follow traditions and customs (1 = Very important; 6 = Not at all important)|
+|`imp_equality`|How important the respondent feels it is people are treated equally and have equal opportunities (1 = Very important; 6 = Not at all important)|
+|`eu_integration`|The respondent's views on European unification/integration (0 = "Unification has already gone too far"; 10 = "Unification should go much further")|
+|`train`|A variable indicating whether the respondent should be used in the training set (`TRUE`) or the test set (`FALSE`).|
+Table: ESS codebook
+
+You can run the following line of code in R and this will load the data directly from the course website:
+
+```{r, echo=TRUE, eval = FALSE}
+ess <- read.csv("https://raw.githubusercontent.com/lse-me314/lse-me314.github.io/master/data/ess.csv")
+
+summary(ess)
+```
+
+
+#### a. Fit a logistic regression with `leave` as the response and with `age`, `gender`, `years_education` and `income` as predictors. Produce a summary of results, and discuss the results.
+
+* __Code__
+
+```{r, echo = TRUE}
+
+glm.fit <- glm(leave ~ age + gender + years_education + income, data = ess, family = binomial)
+
+# We use the summary function to show the results
+summary(glm.fit)
+
+```
+
+* __Coefficients analysis:__
+
+
+**`age`: positive coefficient, which means that the older you are the more susceptible you are to want to leave.**
+
+**`gender`: males are very slightly more prone to want to leave.**
+
+**`years_education`: negative coefficient, the population that want to leave the most are low education ones.**
+
+**`income`: negative coefficient, more income means more desire to stay in the EU.**
+
+**We can see that the most notable variables are the education and the income (both having a significance at <0.001). They might have a similar effect because there is a link between the two, higher education generally means higher income.**
+
+**From these data, I would say that the population most likely to vote to leave are the low income household.**
+
+
+#### b. Calculate the predicted probability of voting to leave the EU for respondents with the following characteristics
+
+1. A 25-year old man, with above median income, and 10 years of education
+
+**Probability of wanting to leave the EU: 17.27%**
+
+```{r, echo=TRUE}
+
+new_data <- data.frame(age=25, gender="Male", years_education=10, income=1)
+predict(glm.fit, new_data, type="response")
+
+```
+
+
+2. A 25-year old woman, with above median income, and 15 years of education
+
+**Probability of wanting to leave the EU: 12.88%**
+
+```{r, echo=TRUE}
+
+new_data <- data.frame(age=25, gender="Female", years_education=15, income=1)
+predict(glm.fit, new_data, type="response")
+
+```
+
+
+3. A 65-year old woman, with below median income, and 8 years of education
+
+**Probability of wanting to leave the EU: 22.99%**
+
+```{r, echo=TRUE}
+
+new_data <- data.frame(age=65, gender="Female", years_education=8, income=0)
+predict(glm.fit, new_data, type="response")
+
+```
+
+
+4. A 65-year old man, with below median income, and 12 years of education
+
+**Probability of wanting to leave the EU: 21.35%**
+
+```{r, echo=TRUE}
+
+new_data <- data.frame(age=65, gender="Male", years_education=12, income=0)
+predict(glm.fit, new_data, type="response")
+
+```
+
+
+Which has the highest probability of voting to leave the EU?
+
+**The highest probability comes from n°3, the person with the lowest years of education.**
+
+
+Note: To calculate predicted probabilities, you can use the `predict()` function with the argument `type = "response"`.
+
+#### c. Using the model you estimated in part (a), calculate the predicted probability of voting to leave the EU for every observation in the data. For how many observations is this probability greater than .5? 
+
+```{r, echo=TRUE}
+
+# We use the predict function but instead of giving it new data we leave it blank
+# so that it will go through the ess dataset
+predicted_outcome <- predict(glm.fit, type="response")
+
+summary(predicted_outcome)
+
+```
+**As we can see the maximum probability is 33.50%, which would mean that no value exceed 0.5. Just to be sure we try to count every value above 0.5:**
+
+```{r, echo=TRUE}
+
+predicted_final <- as.numeric(predicted_outcome >= 0.5)
+summary(predicted_final)
+
+```
+
+
+#### d. Estimate a new logistic regression model, with the same covariates you included before but here also add `country_code`. Calculate the predicted probabilites for each observation in your data, and use these to compute the confusion matrix. What percentage of observations are correctly classified? How many false positives and false negatives are there in this case? 
+
+* __Code__
+
+```{r, echo = TRUE}
+
+glm.fit <- glm(leave ~ age + gender + years_education + income + country_code, data = ess, family = binomial)
+
+# We use the summary function to show the results
+summary(glm.fit)
+
+```
+
+**We can see that some country code have a very high significance, which can explain why the probabilities of the old model were strangely capping at 33%, maybe there were not enough data to differentiate properly the votes.**
+
+
+```{r, echo=TRUE}
+
+predicted_outcome <- predict(glm.fit, type="response")
+predicted_final <- as.numeric(predicted_outcome >= 0.5)
+
+summary(predicted_final)
+
+```
+
+**Now that we have our prediction formatted, we can compute our confusion matrix by comparing the result to the original dataset:**
+
+
+```{r, echo=TRUE}
+
+confusion_matrix <- table(predicted_final, ess$leave)
+confusion_matrix
+
+```
+
+```{r, echo=TRUE}
+
+TN_nb <- confusion_matrix[1]
+FN_nb <- confusion_matrix[2]
+FP_nb <- confusion_matrix[3]
+TP_nb <- confusion_matrix[4]
+
+tot <- TN_nb + FN_nb + FP_nb + TP_nb
+
+```
+
+```{r, echo=TRUE}
+
+(TN_nb + TP_nb) / tot
+
+```
+
+**In this case we can see that 82.58% of cases are correctly classified.**
+
+**The confusion matrix gives us the number of:**
+
+* **False positives**
+
+```{r, echo=FALSE}
+
+FP_nb
+
+```
+
+* **False negatives**
+
+```{r, echo=FALSE}
+
+FN_nb
+
+```
